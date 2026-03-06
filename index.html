@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrameSnap — Video Frame Extractor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: "#6c63ff",
+              hover: "#7c74ff",
+              dim: "rgba(108,99,255,0.15)",
+            },
+            surface: {
+              DEFAULT: "#1a1d27",
+              alt: "#1e2130",
+              deep: "#13151e",
+            },
+            bdr: "#2a2d3e",
+          },
+          animation: {
+            "frame-in": "frameIn 0.3s ease both",
+            "spin-slow": "spin 0.7s linear infinite",
+          },
+          keyframes: {
+            frameIn: {
+              from: { opacity: "0", transform: "scale(0.94) translateY(6px)" },
+              to: { opacity: "1", transform: "scale(1) translateY(0)" },
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* Hide number-input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+
+    /* Smooth seek-bar colour on the native video element */
+    video::-webkit-media-controls-timeline {
+      accent-color: #6c63ff;
+    }
+
+    /* Toastify overrides — dark pill style */
+    .toastify {
+      border-radius: 9999px !important;
+      font-size: 0.85rem !important;
+      font-weight: 500 !important;
+      padding: 0.55rem 1.25rem !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45) !important;
+      border: 1px solid #2a2d3e !important;
+    }
+
+    /* Drag-over ring on upload zone */
+    .drag-over {
+      border-color: #6c63ff !important;
+      background-color: rgba(108, 99, 255, 0.08) !important;
+    }
+
+    /* Lightbox fade */
+    #lightbox {
+      animation: lbIn 0.18s ease;
+    }
+
+    @keyframes lbIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* Progress fill transition */
+    #progressFill {
+      transition: width 0.25s ease;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #2a2d3e;
+      border-radius: 99px;
+    }
+  </style>
+</head>
+
+<body class="bg-[#0f1117] text-slate-100 min-h-screen antialiased">
+
+  <div class="flex flex-col min-h-screen">
+
+    <header class="sticky top-0 z-50 border-b border-bdr bg-surface/80 backdrop-blur-md">
+      <div class="max-w-4xl mx-auto px-5 py-3 flex items-center gap-4">
+
+        <div class="flex items-center gap-2.5 shrink-0">
+          <div class="w-9 h-9 rounded-xl bg-brand-dim border border-brand/30
+                        flex items-center justify-center text-brand">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8
+                         a2 2 0 0 1 2-2h4l2-3h6l2 3h4
+                         a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </div>
+          <span class="font-bold text-[1.05rem] tracking-tight">FrameSnap</span>
+        </div>
+
+        <div class="h-5 w-px bg-bdr hidden sm:block"></div>
+        <p class="text-xs text-slate-500 hidden sm:block">
+          Extract frames from any video — 100% in your browser
+        </p>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-8 flex flex-col gap-6">
+
+      <section id="uploadSection"
+        class="rounded-2xl border border-bdr bg-surface shadow-[0_4px_24px_rgba(0,0,0,0.35)] p-6">
+
+        <div id="uploadZone" class="border-2 border-dashed border-bdr rounded-xl
+                   flex flex-col items-center justify-center gap-3
+                   py-16 px-6 text-center cursor-pointer
+                   transition-all duration-200 hover:border-brand hover:bg-brand-dim">
+          <input id="videoInput" type="file" accept="video/mp4,video/webm,video/quicktime,video/*" class="hidden" />
+
+          <div class="w-16 h-16 rounded-full bg-brand-dim border border-brand/25
+                        flex items-center justify-center text-brand mb-1">
+
+
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16" />
+              <line x1="12" y1="12" x2="12" y2="21" />
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+            </svg>
+
+
+          </div>
+
+          <p class="text-lg font-semibold text-slate-100">Drop your video here</p>
+          <p class="text-sm text-slate-400">or click to browse files</p>
+          <p class="text-xs text-slate-600 tracking-wide">
+            MP4 &bull; WebM &bull; MOV &bull; AVI &bull; MKV
+          </p>
+
+          <button id="browseBtn" class="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                     bg-brand text-white text-sm font-semibold
+                     hover:bg-brand-hover transition-colors
+                     shadow-[0_2px_12px_rgba(108,99,255,0.35)]">
+            Choose Video
+          </button>
+        </div>
+      </section>
+
+      <section id="videoSection" class="hidden rounded-2xl border border-bdr bg-surface
+                 shadow-[0_4px_24px_rgba(0,0,0,0.35)] p-5 flex flex-col gap-5">
+        <div class="flex flex-wrap items-center justify-between gap-3
+                      pb-4 border-b border-bdr">
+          <div class="flex items-center gap-2 flex-wrap min-w-0">
+
+
+            <svg class="text-slate-500 shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+            </svg>
+
+
+            <span id="videoFilename" class="text-sm font-semibold text-slate-200 truncate max-w-[220px]">
+            </span>
+            <span id="videoDuration" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full
+                       text-[0.7rem] font-bold bg-brand-dim text-brand
+                       border border-brand/25">
+            </span>
+            <span id="videoResolution" class="inline-flex items-center px-2.5 py-0.5 rounded-full
+                       text-[0.7rem] font-semibold
+                       bg-slate-800 text-slate-400 border border-bdr">
+            </span>
+          </div>
+
+          <button id="changeVideoBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                     text-xs font-medium text-slate-400 border border-bdr
+                     hover:text-slate-100 hover:bg-slate-800 transition-colors">
+
+
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+
+
+            Change Video
+          </button>
+        </div>
+
+        <div class="rounded-xl overflow-hidden bg-black border border-bdr">
+          <video id="videoPlayer" controls preload="metadata" class="w-full max-h-[440px] object-contain block"></video>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          <div class="rounded-xl border border-bdr bg-surface-alt p-4 flex flex-col gap-3">
+            <p class="flex items-center gap-1.5 text-[0.7rem] font-bold
+                         uppercase tracking-widest text-slate-500">
+
+
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+
+
+              Capture at timestamp
+            </p>
+
+            <div class="flex gap-2">
+              <input id="timestampInput" type="number" min="0" step="0.1" placeholder="Seconds (e.g. 3.5)" class="flex-1 min-w-0 bg-surface-deep border border-bdr rounded-lg
+                         px-3 py-2 text-sm text-slate-100 placeholder-slate-600
+                         outline-none focus:border-brand
+                         focus:ring-2 focus:ring-brand/20 transition" />
+              <button id="captureBtn" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg
+                         bg-brand text-white text-sm font-semibold shrink-0
+                         hover:bg-brand-hover transition-colors
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         shadow-[0_2px_10px_rgba(108,99,255,0.3)]">
+
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8
+                             a2 2 0 0 1 2-2h4l2-3h6l2 3h4
+                             a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+
+
+                Capture
+              </button>
+            </div>
+
+            <p class="text-[0.7rem] text-slate-600 leading-snug">
+              Leave blank to capture current playback position
+            </p>
+          </div>
+
+          <!-- Bulk extraction -->
+          <div class="rounded-xl border border-bdr bg-surface-alt p-4 flex flex-col gap-3">
+            <p class="flex items-center gap-1.5 text-[0.7rem] font-bold
+                         uppercase tracking-widest text-slate-500">
+
+
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </svg>
+
+
+              Extract every N seconds
+            </p>
+
+            <div class="flex gap-2">
+              <input id="intervalInput" type="number" min="0.1" step="0.1" value="2" placeholder="Interval (e.g. 2)"
+                class="flex-1 min-w-0 bg-surface-deep border border-bdr rounded-lg
+                         px-3 py-2 text-sm text-slate-100 placeholder-slate-600
+                         outline-none focus:border-brand
+                         focus:ring-2 focus:ring-brand/20 transition" />
+              <button id="extractAllBtn" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg
+                         border border-brand/50 text-brand text-sm font-semibold shrink-0
+                         hover:bg-brand-dim transition-colors
+                         disabled:opacity-50 disabled:cursor-not-allowed">
+
+
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+
+
+                Extract All
+              </button>
+            </div>
+
+            <p class="text-[0.7rem] text-slate-600 leading-snug">
+              Captures one frame at each interval across the full video
+            </p>
+          </div>
+        </div>
+
+        <div id="progressWrap" class="hidden rounded-xl border border-bdr bg-surface-alt p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span id="progressLabel">Extracting frames…</span>
+            <span id="progressCount" class="font-mono font-semibold">0 / 0</span>
+          </div>
+
+          <div class="h-1.5 rounded-full bg-bdr overflow-hidden">
+            <div id="progressFill" class="h-full rounded-full w-0
+                       bg-gradient-to-r from-brand to-violet-400"></div>
+          </div>
+
+          <div class="flex justify-end">
+            <button id="cancelBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                       text-xs font-medium text-red-400 border border-red-500/30
+                       hover:bg-red-500/10 transition-colors">
+
+
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+
+
+
+              Cancel
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <section id="gallerySection" class="hidden rounded-2xl border border-bdr bg-surface
+                 shadow-[0_4px_24px_rgba(0,0,0,0.35)] p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h2 class="flex items-center gap-2 text-base font-bold">
+            Extracted Frames
+            <span id="frameCount" class="inline-flex items-center justify-center min-w-[22px] h-[22px]
+                       px-1.5 rounded-full text-[0.68rem] font-bold
+                       bg-brand-dim text-brand">0</span>
+          </h2>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="clearAllBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                       text-xs font-medium text-red-400 border border-red-500/30
+                       hover:bg-red-500/10 transition-colors">
+
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8
+                           a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+
+
+              Clear All
+            </button>
+
+            <button id="downloadAllBtn" class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg
+                       bg-brand text-white text-xs font-semibold
+                       hover:bg-brand-hover transition-colors
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       shadow-[0_2px_10px_rgba(108,99,255,0.3)]">
+
+
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+
+              Download All
+            </button>
+          </div>
+        </div>
+
+        <div id="framesGrid" class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr))">
+        </div>
+
+      </section>
+
+    </main>
+
+    <canvas id="extractCanvas" class="hidden"></canvas>
+
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
